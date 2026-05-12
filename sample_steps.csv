@@ -1,0 +1,4 @@
+step_id,domain,step_description,tool_names,supplies_objects,process_technique,safety_equipment,previous_step,next_step,reference_image_url
+S001,plumbing,tighten a compression nut on a toilet fill valve,adjustable wrench,"toilet fill valve, compression nut",tightening,,water has been shut off,check for a slow drip,
+S002,electrical,confirm an outlet is de-energized before removing the cover,non-contact voltage tester,duplex outlet,testing,shut off breaker and dry hands,turn breaker off,remove cover plate,
+S003,woodworking,drill a pilot hole perpendicular to a pine board,cordless drill,"pine board, marked dot",drilling,safety glasses,mark the drill point,drive the screw,

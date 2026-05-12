@@ -1,0 +1,4 @@
+openai>=1.0.0
+google-genai>=1.0.0
+runwayml>=3.0.0
+replicate>=1.0.0
