@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Project 1 step export",
+  "type": "object",
+  "required": ["step_id"],
+  "additionalProperties": true,
+  "properties": {
+    "step_id": {"type": "string", "minLength": 1},
+    "project_id": {"type": ["string", "null"]},
+    "step_index": {"type": ["integer", "null"]},
+    "title": {"type": ["string", "null"]},
+    "description": {"type": ["string", "null"]},
+    "tools": {"type": "array", "items": {"type": "string"}},
+    "materials": {"type": "array", "items": {"type": "string"}},
+    "techniques": {"type": "array", "items": {"type": "string"}},
+    "dense_embeddings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "number"}
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Project 1 clip export",
+  "type": "object",
+  "required": ["clip_id"],
+  "additionalProperties": true,
+  "properties": {
+    "clip_id": {"type": "string", "minLength": 1},
+    "project_id": {"type": ["string", "null"]},
+    "step_id": {"type": ["string", "null"]},
+    "video_id": {"type": ["string", "null"]},
+    "url": {"type": ["string", "null"]},
+    "title": {"type": ["string", "null"]},
+    "description": {"type": ["string", "null"]},
+    "summary": {"type": ["string", "null"]},
+    "transcript": {"type": ["string", "null"]},
+    "automatic_captions": {"type": ["string", "null"]},
+    "whisper_transcript": {"type": ["string", "null"]},
+    "gemini_metadata": {"type": "object"},
+    "dense_embeddings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "number"}
+      }
+    },
+    "created_at": {"type": ["string", "null"], "format": "date-time"},
+    "updated_at": {"type": ["string", "null"], "format": "date-time"}
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Project 1 pairwise comparison export",
+  "type": "object",
+  "required": ["comparison_id", "step_id", "clip_a_id", "clip_b_id", "winner_clip_id"],
+  "additionalProperties": true,
+  "properties": {
+    "comparison_id": {"type": "string", "minLength": 1},
+    "step_id": {"type": "string", "minLength": 1},
+    "clip_a_id": {"type": "string", "minLength": 1},
+    "clip_b_id": {"type": "string", "minLength": 1},
+    "winner_clip_id": {"type": "string", "minLength": 1},
+    "loser_clip_id": {"type": ["string", "null"]},
+    "annotator_id": {"type": ["string", "null"]},
+    "source": {"type": ["string", "null"]},
+    "created_at": {"type": ["string", "null"], "format": "date-time"}
+  }
+}

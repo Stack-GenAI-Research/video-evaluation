@@ -1,0 +1,121 @@
+-- Project 1 PostgreSQL export guide
+--
+-- This file is a guide for making the three JSONL files needed by the Python pipeline.
+-- It is not meant to be run blindly. Check the real table names and column names against
+-- the Stesso TypeScript models before using these query patterns.
+--
+-- Do not put database credentials in this file. Use the normal secure connection process
+-- outside the repository.
+
+-- Clip export
+--
+-- Each output row should become one JSON object in clips.jsonl. The Python code requires
+-- clip_id, but the other fields are useful for extraction, scoring, and later error review.
+-- Dense embeddings should be arrays of numbers. The keys inside dense_embeddings can match
+-- the real embedding dimensions used by the Stesso pipeline.
+--
+-- Expected shape:
+-- {
+--   "clip_id": string,
+--   "project_id": string or null,
+--   "step_id": string or null,
+--   "video_id": string or null,
+--   "url": string or null,
+--   "title": string or null,
+--   "description": string or null,
+--   "summary": string or null,
+--   "transcript": string or null,
+--   "automatic_captions": string or null,
+--   "whisper_transcript": string or null,
+--   "gemini_metadata": object,
+--   "dense_embeddings": object
+-- }
+
+-- Example clip query pattern after the real identifiers are verified:
+-- SELECT jsonb_build_object(
+--   'clip_id', c.id,
+--   'project_id', c.project_id,
+--   'step_id', c.step_id,
+--   'video_id', c.video_id,
+--   'url', c.url,
+--   'title', c.title,
+--   'description', c.description,
+--   'summary', c.summary,
+--   'transcript', COALESCE(c.whisper_transcript, c.automatic_captions),
+--   'automatic_captions', c.automatic_captions,
+--   'whisper_transcript', c.whisper_transcript,
+--   'gemini_metadata', c.gemini_metadata,
+--   'dense_embeddings', jsonb_build_object(
+--     'title', c.title_embedding,
+--     'summary', c.summary_embedding,
+--     'description', c.description_embedding
+--   ),
+--   'created_at', c.created_at,
+--   'updated_at', c.updated_at
+-- )
+-- FROM indexed_video_clips c;
+
+-- Step export
+--
+-- Each output row should become one JSON object in steps.jsonl. The Python code requires
+-- step_id. Dense embeddings should use keys that can be compared with the clip embeddings.
+-- For example, if clips have a description embedding, steps should also have a compatible
+-- description embedding if that score is going to be used.
+--
+-- Expected shape:
+-- {
+--   "step_id": string,
+--   "project_id": string or null,
+--   "step_index": integer or null,
+--   "title": string or null,
+--   "description": string or null,
+--   "tools": array,
+--   "materials": array,
+--   "techniques": array,
+--   "dense_embeddings": object
+-- }
+
+-- Example step query pattern after the real identifiers are verified:
+-- SELECT jsonb_build_object(
+--   'step_id', s.id,
+--   'project_id', s.project_id,
+--   'step_index', s.step_index,
+--   'title', s.title,
+--   'description', s.description,
+--   'tools', COALESCE(s.tools, '[]'::jsonb),
+--   'materials', COALESCE(s.materials, '[]'::jsonb),
+--   'techniques', COALESCE(s.techniques, '[]'::jsonb),
+--   'dense_embeddings', jsonb_build_object(
+--     'title', s.title_embedding,
+--     'description', s.description_embedding
+--   )
+-- )
+-- FROM project_steps s;
+
+-- Pairwise comparison export
+--
+-- Each output row should become one JSON object in pairwise.jsonl. These IDs must join
+-- exactly to clips.jsonl and steps.jsonl. winner_clip_id must equal either clip_a_id or
+-- clip_b_id.
+--
+-- Expected shape:
+-- {
+--   "comparison_id": string,
+--   "step_id": string,
+--   "clip_a_id": string,
+--   "clip_b_id": string,
+--   "winner_clip_id": string
+-- }
+
+-- Example pairwise query pattern after the real identifiers are verified:
+-- SELECT jsonb_build_object(
+--   'comparison_id', p.id,
+--   'step_id', p.step_id,
+--   'clip_a_id', p.clip_a_id,
+--   'clip_b_id', p.clip_b_id,
+--   'winner_clip_id', p.winner_clip_id,
+--   'annotator_id', p.annotator_id,
+--   'source', p.source,
+--   'created_at', p.created_at
+-- )
+-- FROM clip_pair_comparisons p;
