@@ -8,6 +8,14 @@ from typing import Any
 from .models import ClipRecord, StepRecord, TextSegment
 
 _SPACE_RE = re.compile(r"\s+")
+_NON_NARRATIVE_INDEXED_VIDEO_METADATA_PREFIXES = (
+    # These fields are preserved for provenance and later structured matching,
+    # but treating labels and inventories as sentences creates false actions
+    # such as "clean" from a category or "scrub" from a brush name.
+    "gemini_metadata.source_video",
+    "gemini_metadata.clip.tools",
+    "gemini_metadata.clip.supplies",
+)
 
 
 def normalize_text(value: Any) -> str:
@@ -66,6 +74,8 @@ def clip_text_segments(clip: ClipRecord, min_length: int = 3) -> list[TextSegmen
             segments.append(TextSegment(record_type="clip", record_id=clip.clip_id, source_field=field, text=text))
             seen.add((field, text))
     for field, text in flatten_text_values(clip.gemini_metadata, prefix="gemini_metadata"):
+        if field.startswith(_NON_NARRATIVE_INDEXED_VIDEO_METADATA_PREFIXES):
+            continue
         if len(text) >= min_length and (field, text) not in seen:
             confidence = 0.9 if "frames" in field or "steps" in field else 0.85
             segments.append(

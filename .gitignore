@@ -157,6 +157,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# Private research exports and derived local analysis artifacts
+indexed-videos-*.jsonl
+project1_outputs/
+
 # Spyder project settings
 .spyderproject
 .spyproject

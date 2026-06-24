@@ -103,11 +103,10 @@ def triples_from_doc(segment: TextSegment, doc: Doc) -> list[ActionTriple]:
     triples: list[ActionTriple] = []
     for sentence in doc.sents:
         for token in sentence:
-            if token.pos_ not in {"VERB", "AUX"}:
-                continue
-            if token.lemma_.lower() in {"be", "have", "do"} and not any(
-                child.dep_ in _OBJECT_DEPS for child in token.children
-            ):
+            # Auxiliary tokens (for example "will" in "will remove") are
+            # grammatical support, not the instructional action.  The main
+            # verb still carries the object and tool dependencies we need.
+            if token.pos_ != "VERB":
                 continue
             object_tokens = _first_object_span(token)
             tool_tokens = _prep_object_span(token, _TOOL_PREPS)

@@ -7,12 +7,14 @@ from typing import Annotated
 import typer
 
 from .config import DEFAULT_RANDOM_SEED, DEFAULT_SPACY_MODEL, PipelineConfig
+from .indexed_videos import prepare_indexed_videos as prepare_indexed_videos_impl
 from .logging_utils import info
 from .month1 import run_month1 as run_month1_impl
 from .month2 import run_month2 as run_month2_impl
 from .quality import require_nonempty_report, validate_jsonl_basic
 from .retrieval.experiments import run_month3 as run_month3_impl
-from .verification import verify_output_repository
+from .sample_analysis import run_indexed_video_analysis as run_indexed_video_analysis_impl
+from .verification import verify_output_repository, verify_structured_analysis
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -51,6 +53,35 @@ def validate_inputs(
     report_path = output_dir / "input_validation_report.json"
     report_path.write_text(json.dumps(reports, indent=2, sort_keys=True), encoding="utf-8")
     info(f"Input validation passed. Report written to {report_path}")
+
+
+@app.command()
+def prepare_indexed_videos(
+    indexed_videos_jsonl: Annotated[Path, typer.Option(exists=True, readable=True)],
+    output_dir: Annotated[Path, typer.Option()],
+) -> None:
+    """Flatten the nested IndexedVideo sample into real clip records for Month 1/2."""
+    paths = prepare_indexed_videos_impl(indexed_videos_jsonl, output_dir)
+    info(f"Prepared {paths['clips']}. Data profile written to {paths['profile']}")
+
+
+@app.command()
+def run_indexed_video_analysis(
+    indexed_videos_jsonl: Annotated[Path, typer.Option(exists=True, readable=True)],
+    output_dir: Annotated[Path, typer.Option()],
+    min_taxonomy_support: Annotated[int, typer.Option(min=1)] = 2,
+    spacy_model: Annotated[str, typer.Option()] = DEFAULT_SPACY_MODEL,
+    random_seed: Annotated[int, typer.Option()] = DEFAULT_RANDOM_SEED,
+) -> None:
+    """Run the real sample through Month 1/2, then record why Month 3 cannot run."""
+    paths = run_indexed_video_analysis_impl(
+        indexed_videos_jsonl=indexed_videos_jsonl,
+        output_dir=output_dir,
+        min_taxonomy_support=min_taxonomy_support,
+        spacy_model=spacy_model,
+        random_seed=random_seed,
+    )
+    info(f"IndexedVideo analysis complete. Report written to {paths['report']}")
 
 
 @app.command()
@@ -157,6 +188,18 @@ def verify_repository(
     """Verify that generated month 1-3 artifacts are present, nonempty, and internally valid."""
     verify_output_repository(output_dir)
     info(f"Repository verification passed. Report written to {output_dir / 'verification_report.json'}")
+
+
+@app.command()
+def verify_structured_outputs(
+    output_dir: Annotated[Path, typer.Option(exists=True, file_okay=False, readable=True)],
+) -> None:
+    """Verify Month 1/2 output when pairwise retrieval data is not available."""
+    verify_structured_analysis(output_dir)
+    info(
+        "Structured-analysis verification passed. Report written to "
+        f"{output_dir / 'structured_analysis_verification_report.json'}"
+    )
 
 
 if __name__ == "__main__":

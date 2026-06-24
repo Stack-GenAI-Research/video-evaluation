@@ -52,10 +52,12 @@ def roles_from_doc(segment: TextSegment, doc: Doc) -> list[SrlRole]:
     rows: list[SrlRole] = []
     for sentence in doc.sents:
         for token in sentence:
-            if token.pos_ not in {"VERB", "AUX"}:
+            # Keep SRL predicates aligned with triple extraction: auxiliaries
+            # express tense or modality, rather than the action itself.
+            if token.pos_ != "VERB":
                 continue
             lemma = normalize_term(token.lemma_ or token.text)
-            if not lemma or (lemma in {"be", "have", "do"} and not _child_by_dep(token, _PATIENT_DEPS)):
+            if not lemma:
                 continue
             rows.append(
                 SrlRole(

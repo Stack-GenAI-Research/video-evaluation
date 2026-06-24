@@ -46,7 +46,7 @@ def month1_summary(triples: list[ActionTriple]) -> dict[str, Any]:
 def run_month1(
     *,
     clips_jsonl: Path,
-    steps_jsonl: Path,
+    steps_jsonl: Path | None,
     config: PipelineConfig,
 ) -> dict[str, Path]:
     month_dir = config.ensure_output_dir() / "month1"
@@ -55,7 +55,7 @@ def run_month1(
     clips = read_clips(clips_jsonl)
     if config.clip_limit is not None:
         clips = clips[: config.clip_limit]
-    steps = read_steps(steps_jsonl)
+    steps = read_steps(steps_jsonl) if steps_jsonl is not None else []
 
     segments = build_segments(clips, steps, config.min_text_length)
     triples = extract_triples(segments, config.spacy_model)
@@ -91,7 +91,7 @@ def run_month1(
         manifest_path,
         build_manifest(
             command="run-month1",
-            input_files=[clips_jsonl, steps_jsonl],
+            input_files=[path for path in [clips_jsonl, steps_jsonl] if path is not None],
             output_files=output_files,
             parameters={
                 "spacy_model": config.spacy_model,

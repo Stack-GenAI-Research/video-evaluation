@@ -1,375 +1,123 @@
 # Project 1: Action Semantics for Instructional Video Retrieval
 
-This repository contains the Python code I have written so far for Project 1 from the Stesso/Purdue research project list. The project studies whether structured action information can improve instructional video retrieval. The main idea is to compare dense embedding similarity with action matching, where the code tries to identify the action, object, tool, material, VerbNet class, FrameNet frame, and a first version of a DIY-specific action taxonomy.
+This is my implementation for Project 1 from the Stesso/Purdue research list. The question behind the project is fairly simple: when someone searches for an instructional video, is it enough that a clip is about the same topic, or does it need to show the exact action on the right object with the right tool?
 
-The code is written so it can run on the real Stesso export files, but the private Stesso data is not included in this repository. I did not add fake clip rows, fake embeddings, fake pairwise labels, or fake final results. The project PDF says the real study uses the 67K `IndexedVideoClip` records, `geminiMetaData`, transcripts, and 2,077 `ClipPairComparison` rows. Those actual database rows still have to be exported before the full research results can be produced.
+Dense embeddings are good at finding things that are generally related. They can still confuse “same topic” with “same action.” For example, two plumbing clips can be very similar even if one installs a valve and the other removes a pipe. This project tests whether structured action information can make that distinction more directly.
 
-### Current project status
+The code extracts action-object-tool-material triples, then adds VerbNet, FrameNet, SRL-style roles, and a first DIY action taxonomy. Once the full research exports are available, it compares dense-only, structured-only, and hybrid retrieval against human pairwise judgments.
 
-The code for the first three months is implemented and can be run after the real JSONL export files are available.
+## What I accomplished
 
-Month 1 is responsible for creating text segments from clips and steps, extracting action-object-tool triples, and mapping action lemmas to VerbNet and WordNet. Month 2 adds FrameNet mappings, dependency-based SRL-style roles, and a first version of `DIY-ActionNet`. Month 3 compares dense, structured, and hybrid scores against the pairwise comparison labels.
+I added an automated path for the private `indexed-videos-250.jsonl` sample. This file is not shaped like the main pipeline input: it contains 250 videos, each with a nested list of clips. The new adapter flattens those nested records into 1,703 stable clip records, keeps the source video and timing information, and writes a profile showing which fields are actually available.
 
-The repository also includes input validation, manifest files, output verification, and unit tests for the pieces that can be tested without the private database.
+I also added a single Bash script that can set up the environment, run the tests, and run the available pipeline. The script uses a supported Python version, downloads the NLP resources, verifies the code, runs the real sample, and points to the final report.
 
-What is finished:
+The important design choice is that the sample pipeline does not invent missing research inputs. It runs Months 1 and 2, which the sample supports, then stops before Month 3. The sample does not contain project steps, `ClipPairComparison` labels, or dense embedding vectors, so a retrieval accuracy number would not be a real result.
 
-- Text normalization for clip and step fields.
-- Text extraction from nested `gemini_metadata` fields.
-- Action-object-tool-material triple extraction with spaCy dependency parsing.
-- VerbNet and WordNet action mapping through NLTK.
-- FrameNet action mapping through NLTK.
-- Dependency-based SRL-style extraction for agent, patient, instrument, and location/scope.
-- `DIY-ActionNet v1` clustering from extracted action contexts.
-- Dense score calculation from shared embedding keys.
-- Structured score calculation from action, object, tool, VerbNet, FrameNet, and taxonomy matches.
-- Hybrid scoring that combines dense and structured scores.
-- Pairwise evaluation against `ClipPairComparison`-style labels.
-- Repository verification for the generated month 1, month 2, and month 3 outputs.
+## Quick start
 
-What still needs to be completed with the real project data:
-
-- Export the real `clips.jsonl`, `steps.jsonl`, and `pairwise.jsonl` files from PostgreSQL.
-- Confirm the real table and column names against the TypeScript models before running the SQL patterns.
-- Make sure all required dense embeddings are exported into `dense_embeddings` fields.
-- Run the full month 1 through month 3 pipeline on the real export files.
-- Review a sample of extracted triples and SRL roles by hand, because extraction quality is part of the research work.
-- Check the final retrieval results and write the real research tables only after the real output files are produced.
-
-### Running the Python project
-
-Clone or unzip this repository on a machine with Python 3.11, 3.12, or 3.13. Then, move into the repository directory.
+On macOS or Linux, from the repository root, run:
 
 ```bash
-cd project1-action-semantics
+./scripts/run_local_pipeline.sh all
 ```
 
-Create and activate a virtual environment.
+This is the normal command to use. It will:
+
+1. Create `.venv` with Python 3.11, 3.12, or 3.13.
+2. Install the project and development dependencies.
+3. Download spaCy and NLTK resources.
+4. Compile the source files, run the test suite, run Ruff, and check the command-line interface.
+5. Flatten the private IndexedVideo sample and run its Month 1/2 analysis.
+6. Verify the generated artifacts.
+
+The default local output folder is `project1_outputs/indexed-video-sample/`. It is ignored by Git because it contains derived private-data results. The main report is:
+
+```text
+project1_outputs/indexed-video-sample/sample_analysis_report.json
+```
+
+If the sample JSONL lives somewhere else, point the script at it:
 
 ```bash
-python -m venv .venv
-. .venv/bin/activate
+SAMPLE_JSONL=/secure/path/indexed-videos-250.jsonl \
+  ./scripts/run_local_pipeline.sh all
 ```
 
-On Windows PowerShell, the activation command is different.
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-Upgrade pip and install the project.
+The script also supports smaller commands:
 
 ```bash
-python -m pip install --upgrade pip
-python -m pip install -e .
+./scripts/run_local_pipeline.sh setup   # install only
+./scripts/run_local_pipeline.sh test    # compile, test, lint, and check the CLI
+./scripts/run_local_pipeline.sh sample  # run only the real IndexedVideo sample
+./scripts/run_local_pipeline.sh --help
 ```
 
-Install the NLP resources used by month 1 and month 2.
+## Findings from the real sample run
+
+I ran the sample pipeline in June 2026 with `--min-taxonomy-support 2`. The input had 250 videos and 1,703 nested clips. The data is reasonably rich in clip tools (74.5% of clips have a tool field), but less consistent in written descriptions (36.2%) and explicit goals (29.5%).
+
+Month 1 produced 8,823 action triples from 1,006 unique action lemmas. The system extracted an object for 63.1% of the triples. It extracted a dependency-linked tool for only 3.5% of them.
+
+Month 2 produced 1,006 VerbNet mappings, 1,006 FrameNet mappings, 8,823 SRL-style role rows, and a first `DIY-ActionNet` taxonomy with 660 actions in 80 clusters.
+
+These are real extraction results, but they are not retrieval results. I cannot yet say that structured action matching beats dense embeddings, because the sample has no project-step queries, no pairwise human judgments, and no dense vectors to compare against.
+
+The most useful finding so far is the low tool-linkage rate. The source sample often lists a tool as metadata instead of placing it in a sentence such as “tighten the screw with a screwdriver.” That is a concrete error-analysis target: I need to check whether the tool is present but linguistically disconnected from the action, or whether the parser is missing the relationship.
+
+## What the pipeline does
+
+Month 1 converts clip and step text into text segments, extracts action-object-tool-material triples with spaCy dependency parsing, and maps action lemmas to VerbNet and WordNet.
+
+Month 2 maps the actions to FrameNet, extracts dependency-based SRL-style roles, and clusters recurring action contexts into `DIY-ActionNet v1`.
+
+Month 3 is the actual retrieval experiment. It calculates dense, structured, and hybrid scores for each step/clip pair, then compares the predicted winner against the pairwise human label. It reports pairwise accuracy and a bootstrap confidence interval.
+
+The IndexedVideo sample runs only Months 1 and 2. The full path remains in the repository and becomes runnable once the missing exports are available.
+
+## Running the full evaluation later
+
+The full study needs three real JSONL exports:
+
+- `clips.jsonl`: one row per indexed clip, including `clip_id` and any available text and dense embeddings.
+- `steps.jsonl`: one row per project step, including `step_id`, text, tools, materials, techniques, and dense embeddings.
+- `pairwise.jsonl`: one row per comparison, including `comparison_id`, `step_id`, `clip_a_id`, `clip_b_id`, and `winner_clip_id`.
+
+When those files are available, the same script can validate and run the complete evaluation:
 
 ```bash
-python -m spacy download en_core_web_sm
-python -m nltk.downloader verbnet wordnet omw-1.4 framenet_v17
+CLIPS_JSONL=/secure/path/clips.jsonl \
+STEPS_JSONL=/secure/path/steps.jsonl \
+PAIRWISE_JSONL=/secure/path/pairwise.jsonl \
+PROJECT_OUTPUT_DIR=/secure/path/project1_outputs \
+  ./scripts/run_local_pipeline.sh full
 ```
 
-If the machine cannot download these resources, the pipeline will still install, but month 1 and month 2 will stop with an error explaining which resource is missing. That is better than silently producing weak extraction output.
+The `full` command validates all three inputs first. It then runs Months 1–3, including output verification. It uses all exported clips (`--clip-limit 0`), so I would first test the command on a smaller secure export before running the full 67K-clip job.
 
-Check that the command line tool is available.
+For a more manual workflow, the CLI remains available:
 
 ```bash
-action-semantics --help
+.venv/bin/action-semantics --help
 ```
 
-The same help command can also be run without installing the console script.
+The JSON schemas are in `data_contracts/`, and the PostgreSQL export patterns are in `sql/postgres_export_contract.sql`. The SQL file is a guide, not a production command: table and column names still need to be checked against the real Stesso schema.
 
-```bash
-PYTHONPATH=src python -m action_semantics.cli --help
-```
+## Outputs to inspect
 
-### Running the tests
+The sample runner writes these files under its output directory:
 
-The repository includes unit tests that do not use the private Stesso dataset.
+- `input/indexed_video_clips.jsonl`: the flattened, source-derived clip records.
+- `input/indexed_video_profile.json`: record counts, field coverage, and the explicit Month 3 blockers.
+- `month1/action_object_tool_triples.csv`: an easy file to inspect for extraction errors.
+- `month1/month1_summary.json`: action counts and object/tool coverage.
+- `month2/srl_roles.csv`: extracted predicate, patient, instrument, and scope fields.
+- `month2/diy_actionnet_v1.jsonl`: the first action taxonomy assignments.
+- `sample_analysis_report.json`: the combined result summary.
+- `structured_analysis_verification_report.json`: the nonempty-field and artifact checks.
 
-```bash
-python -m pytest -q
-```
+## What still needs to happen
 
-To also check that all Python files compile, run:
+The remaining work is not just “run more code.” I still need the real project-step export, the pairwise comparison export, and dense embeddings before testing the main research hypothesis. I also need a manual, stratified review of triples and SRL rows, especially for actions with tools. After that, I can run the complete dense-versus-structured comparison and make claims about retrieval quality.
 
-```bash
-python -m compileall -q src tests
-```
-
-These checks confirm that the package imports, the main utility functions work, and the CLI can be called. They do not replace the full pipeline run on the real 67K clip export.
-
-### Input files needed for the full pipeline
-
-The full pipeline expects three JSONL files. Each line should be one JSON object.
-
-`clips.jsonl` contains one row per indexed video clip. The most important field is `clip_id`. The row can also include title, description, summary, transcript fields, `gemini_metadata`, and dense embeddings.
-
-`steps.jsonl` contains one row per project step. The most important field is `step_id`. The row can also include title, description, tools, materials, techniques, and dense embeddings.
-
-`pairwise.jsonl` contains the pairwise comparison labels. It needs `comparison_id`, `step_id`, `clip_a_id`, `clip_b_id`, and `winner_clip_id`.
-
-The schemas are in `data_contracts/`. Extra fields are allowed, so the export can keep useful original metadata from Stesso.
-
-The ID fields should not be renamed or anonymized if the goal is to reproduce the evaluation. Month 3 depends on exact joins between `step_id`, `clip_id`, `clip_a_id`, `clip_b_id`, and `winner_clip_id`.
-
-### Validating the real exports
-
-Before running extraction, validate the three input files.
-
-```bash
-action-semantics validate-inputs \
-  --clips-jsonl /secure/path/clips.jsonl \
-  --steps-jsonl /secure/path/steps.jsonl \
-  --pairwise-jsonl /secure/path/pairwise.jsonl \
-  --output-dir /secure/path/project1_outputs
-```
-
-This command checks that the files are nonempty, required fields are present, and IDs are not duplicated where they need to be unique.
-
-### Running month 1
-
-Month 1 reads the real clips and steps, builds text segments, extracts action-object-tool triples, and maps actions to VerbNet and WordNet.
-
-```bash
-action-semantics run-month1 \
-  --clips-jsonl /secure/path/clips.jsonl \
-  --steps-jsonl /secure/path/steps.jsonl \
-  --output-dir /secure/path/project1_outputs \
-  --clip-limit 5000
-```
-
-The default clip limit is 5,000 because that matches the month 1 milestone. To run all clips from the CLI, pass `--clip-limit 0` after confirming the compute time is acceptable. For normal project work, I would keep the 5,000 clip run first and only scale up after checking the extraction output.
-
-Month 1 writes:
-
-- `month1/text_segments.jsonl`
-- `month1/action_object_tool_triples.jsonl`
-- `month1/action_object_tool_triples.csv`
-- `month1/verbnet_mappings.jsonl`
-- `month1/month1_summary.json`
-- `month1/manifest.json`
-
-### Running month 2
-
-Month 2 reads the month 1 outputs, maps actions to FrameNet, extracts SRL-style roles, and builds `DIY-ActionNet v1`.
-
-```bash
-action-semantics run-month2 \
-  --month1-dir /secure/path/project1_outputs/month1 \
-  --output-dir /secure/path/project1_outputs \
-  --min-taxonomy-support 2
-```
-
-The `--min-taxonomy-support` value controls how many times an action lemma must appear before it is included in the taxonomy clustering. A value of 2 is a reasonable first pass, but it should be tuned after seeing the real action distribution.
-
-Month 2 writes:
-
-- `month2/framenet_mappings.jsonl`
-- `month2/srl_roles.jsonl`
-- `month2/srl_roles.csv`
-- `month2/diy_actionnet_v1.jsonl`
-- `month2/verb_cluster_assignments.csv`
-- `month2/diy_actionnet_diagnostics.json`
-- `month2/manifest.json`
-
-### Running month 3
-
-Month 3 reads the original exports plus the month 1 and month 2 outputs. It scores the clip pairs that appear in the pairwise comparison file and evaluates dense, structured, and hybrid scoring.
-
-```bash
-action-semantics run-month3 \
-  --clips-jsonl /secure/path/clips.jsonl \
-  --steps-jsonl /secure/path/steps.jsonl \
-  --pairwise-jsonl /secure/path/pairwise.jsonl \
-  --month1-dir /secure/path/project1_outputs/month1 \
-  --month2-dir /secure/path/project1_outputs/month2 \
-  --output-dir /secure/path/project1_outputs \
-  --hybrid-alpha 0.5
-```
-
-`--hybrid-alpha` controls how much the hybrid score trusts dense embeddings. A value of `0.5` gives equal weight to the dense and structured scores after the dense score is converted from cosine similarity into a 0 to 1 scale.
-
-If the export has many dense embedding fields and only some should be used, pass the desired keys like this:
-
-```bash
-action-semantics run-month3 \
-  --clips-jsonl /secure/path/clips.jsonl \
-  --steps-jsonl /secure/path/steps.jsonl \
-  --pairwise-jsonl /secure/path/pairwise.jsonl \
-  --month1-dir /secure/path/project1_outputs/month1 \
-  --month2-dir /secure/path/project1_outputs/month2 \
-  --output-dir /secure/path/project1_outputs \
-  --dense-key title \
-  --dense-key description \
-  --hybrid-alpha 0.5
-```
-
-Month 3 writes:
-
-- `month3/step_clip_scores.jsonl`
-- `month3/step_clip_scores.csv`
-- `month3/pairwise_eval_dense.jsonl`
-- `month3/pairwise_eval_structured.jsonl`
-- `month3/pairwise_eval_hybrid.jsonl`
-- `month3/evaluation_summary.json`
-- `month3/manifest.json`
-
-### Running everything together
-
-After validating the input files, the whole sequence can be run with one command.
-
-```bash
-action-semantics run-all \
-  --clips-jsonl /secure/path/clips.jsonl \
-  --steps-jsonl /secure/path/steps.jsonl \
-  --pairwise-jsonl /secure/path/pairwise.jsonl \
-  --output-dir /secure/path/project1_outputs \
-  --clip-limit 5000 \
-  --min-taxonomy-support 2 \
-  --hybrid-alpha 0.5
-```
-
-This command runs month 1, month 2, month 3, and then checks that the required output artifacts exist.
-
-### Verifying generated outputs
-
-After the pipeline runs, verify the generated output folder.
-
-```bash
-action-semantics verify-repository \
-  --output-dir /secure/path/project1_outputs
-```
-
-The verification step checks that expected files are present, JSONL files are nonempty, required fields are present, and unique IDs are not duplicated where uniqueness is expected. It writes `verification_report.json` into the output directory.
-
-### Exporting from PostgreSQL
-
-The file `sql/postgres_export_contract.sql` contains export patterns for clips, steps, and pairwise comparisons. It is not meant to be copied blindly into production. The table and column names should first be checked against the real Stesso schema and the TypeScript model files named in the project PDF.
-
-The SQL guide also does not contain database credentials. Use the normal secure database connection process outside the repository.
-
-### Package outline
-
-### `action_semantics.cli`
-
-Functionality:
-This file defines the command line interface for the project. It includes commands for validating inputs, running month 1, running month 2, running month 3, running all months together, and verifying generated outputs.
-
-Testing:
-The help command has been checked locally. Full CLI testing should be done with a small private export that has the same schema as the real files.
-
-Relationship to other files:
-The CLI calls `month1.py`, `month2.py`, `retrieval/experiments.py`, and `verification.py`.
-
-### `action_semantics.models`
-
-Functionality:
-This file stores the Pydantic models used by the project. These models validate clips, steps, pairwise comparisons, extracted triples, VerbNet mappings, FrameNet mappings, SRL roles, taxonomy assignments, score rows, and pairwise evaluation rows.
-
-Testing:
-The models run whenever JSONL files are loaded. If an ID is blank, or if a pairwise winner is not either clip A or clip B, validation fails before scoring starts.
-
-Relationship to other files:
-Most other files import one or more models from here.
-
-### `action_semantics.text`
-
-Functionality:
-This file normalizes text and converts clip and step records into text segments. It also searches through nested `gemini_metadata` values so useful text in frames, tools, materials, techniques, and summaries can still be used.
-
-Testing:
-The current tests check whitespace cleanup and term normalization. More tests should be added after real metadata examples are available.
-
-Relationship to other files:
-Month 1 uses this file before running extraction.
-
-### `action_semantics.extraction.triples`
-
-Functionality:
-This file uses spaCy dependency parses to extract action-object-tool-material triples from text segments. This is the main month 1 extraction module.
-
-Testing:
-The next useful test would use a small private set of real Stesso metadata snippets. That would let us check whether actions like `caulk`, `grout`, `cut`, `remove`, `install`, `tighten`, and `deburr` are attached to the right objects and tools.
-
-Relationship to other files:
-Month 1 calls this module, and month 3 uses the extracted triples for structured scoring.
-
-### `action_semantics.extraction.verbnet`
-
-Functionality:
-This file maps action lemmas to VerbNet classes and WordNet synsets using NLTK.
-
-Testing:
-The main setup issue is missing NLTK data. If the data is missing, the code gives the downloader command instead of failing silently.
-
-Relationship to other files:
-Month 1 writes the VerbNet mappings. Month 3 uses them as part of the structured score.
-
-### `action_semantics.extraction.framenet`
-
-Functionality:
-This file maps action lemmas to FrameNet lexical units and frames. It is part of the month 2 work.
-
-Testing:
-The mapping should be reviewed on real DIY verbs, because many home improvement verbs may not be covered well by general FrameNet resources.
-
-Relationship to other files:
-Month 2 writes the FrameNet mappings. Month 3 uses them as another structured scoring signal.
-
-### `action_semantics.extraction.srl`
-
-Functionality:
-This file extracts SRL-style roles from dependency parses. It is not a full neural SRL model, but it gives useful fields for agent, patient, instrument, and location/scope.
-
-Testing:
-This should be checked against real clip and step text before using the output for research claims.
-
-Relationship to other files:
-Month 2 writes the SRL role file for analysis and error review.
-
-### `action_semantics.taxonomy`
-
-Functionality:
-This file builds `DIY-ActionNet v1` by grouping extracted action lemmas based on their surrounding object, tool, material, and sentence context.
-
-Testing:
-The unit tests check that the taxonomy builder handles a small one-action case. Larger validation needs the real extracted action distribution.
-
-Relationship to other files:
-Month 2 calls this file, and month 3 uses the taxonomy assignments in structured scoring.
-
-### `action_semantics.retrieval.scorers`
-
-Functionality:
-This file calculates dense scores, structured scores, and hybrid scores for step-clip pairs.
-
-Testing:
-The scoring logic should be reviewed with real examples where the correct action matters more than the general topic.
-
-Relationship to other files:
-Month 3 calls this file to generate `step_clip_scores.jsonl`.
-
-### `action_semantics.retrieval.evaluation`
-
-Functionality:
-This file turns pairwise scores into predicted winners and calculates accuracy with a bootstrap confidence interval. Missing scores are kept as missing data instead of being treated as real ties.
-
-Testing:
-The tests check winner prediction, ties, missing scores, reciprocal rank, and NDCG.
-
-Relationship to other files:
-Month 3 uses this file to write the evaluation summary.
-
-### `action_semantics.verification`
-
-Functionality:
-This file checks whether the expected month 1, month 2, and month 3 artifacts exist and contain valid nonempty JSONL rows.
-
-Testing:
-This should be run after every real pipeline run.
-
-Relationship to other files:
-The CLI calls it from `verify-repository` and `run-all`.
+For the current detailed data status and exact local verification record, see [DATA_COMPLETION_STATUS.md](DATA_COMPLETION_STATUS.md) and [LOCAL_VERIFICATION.md](LOCAL_VERIFICATION.md).
