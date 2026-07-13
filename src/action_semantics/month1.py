@@ -10,7 +10,67 @@ from .extraction.verbnet import map_triple_verbs
 from .io_utils import read_clips, read_steps, write_csv, write_jsonl
 from .models import ActionTriple, ClipRecord, StepRecord, TextSegment
 from .provenance import build_manifest, write_manifest
-from .text import clip_text_segments, step_text_segments
+from .text import clip_text_segments, normalize_term, step_text_segments
+
+
+_INVENTORY_STOPWORDS = {"a", "an", "and", "or", "the", "with"}
+
+
+def _inventory_terms(values: list[str]) -> list[str]:
+    """Keep both full inventory phrases and useful individual words."""
+    terms: set[str] = set()
+    for value in values:
+        normalized = normalize_term(value)
+        if not normalized:
+            continue
+        terms.add(normalized)
+        terms.update(
+            token
+            for token in normalized.split()
+            if len(token) > 1 and token not in _INVENTORY_STOPWORDS
+        )
+    return sorted(terms)
+
+
+def _clip_inventory(clip: ClipRecord) -> tuple[list[str], list[str]]:
+    metadata = clip.gemini_metadata.get("clip", {})
+    if not isinstance(metadata, dict):
+        return [], []
+    tools = metadata.get("tools", [])
+    supplies = metadata.get("supplies", [])
+    return (
+        _inventory_terms(tools if isinstance(tools, list) else []),
+        _inventory_terms(supplies if isinstance(supplies, list) else []),
+    )
+
+
+def add_record_inventories(
+    triples: list[ActionTriple],
+    clips: list[ClipRecord],
+    steps: list[StepRecord],
+) -> list[ActionTriple]:
+    """Attach record-level tools/materials without calling them direct dependencies."""
+    inventories: dict[tuple[str, str], tuple[list[str], list[str]]] = {}
+    for clip in clips:
+        inventories[("clip", clip.clip_id)] = _clip_inventory(clip)
+    for step in steps:
+        inventories[("step", step.step_id)] = (
+            _inventory_terms(step.tools),
+            _inventory_terms(step.materials),
+        )
+    return [
+        triple.model_copy(
+            update={
+                "context_tool_lemmas": inventories.get(
+                    (triple.record_type, triple.record_id), ([], [])
+                )[0],
+                "context_material_lemmas": inventories.get(
+                    (triple.record_type, triple.record_id), ([], [])
+                )[1],
+            }
+        )
+        for triple in triples
+    ]
 
 
 def build_segments(
@@ -58,7 +118,9 @@ def run_month1(
     steps = read_steps(steps_jsonl) if steps_jsonl is not None else []
 
     segments = build_segments(clips, steps, config.min_text_length)
-    triples = extract_triples(segments, config.spacy_model)
+    triples = add_record_inventories(
+        extract_triples(segments, config.spacy_model), clips, steps
+    )
     verbnet_rows = map_triple_verbs(triples)
 
     segments_path = month_dir / "text_segments.jsonl"
@@ -77,7 +139,9 @@ def run_month1(
             *ActionTriple.model_fields.keys(),
             "object_lemmas_joined",
             "tool_lemmas_joined",
+            "context_tool_lemmas_joined",
             "material_lemmas_joined",
+            "context_material_lemmas_joined",
         ],
     )
     write_jsonl(verbnet_path, verbnet_rows)

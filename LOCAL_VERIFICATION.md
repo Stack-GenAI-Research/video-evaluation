@@ -14,7 +14,7 @@ The automated pipeline was checked locally with Python 3.13. The machine's defau
 .venv/bin/action-semantics --help
 ```
 
-The test suite passed locally with 11 tests. Compilation and Ruff also passed, and the installed CLI displayed all commands, including `prepare-indexed-videos`, `run-indexed-video-analysis`, and `verify-structured-outputs`.
+The test suite passed locally with 15 tests. Compilation and Ruff also passed, and the installed CLI displayed all commands, including `prepare-indexed-videos`, `run-indexed-video-analysis`, `verify-structured-outputs`, and `summarize-review`.
 
 The following command ran the real private sample without creating fake retrieval inputs:
 
@@ -29,5 +29,7 @@ The following command ran the real private sample without creating fake retrieva
 ```
 
 The run flattened 250 videos into 1,703 clip records. Month 1 generated 8,823 action triples from 1,006 unique action lemmas and 1,006 VerbNet lookup rows; 63.1% of triples had an extracted object and 3.5% had a dependency-linked tool. Month 2 generated 1,006 FrameNet lookup rows, 8,823 SRL-style rows, and 660 `DIY-ActionNet v1` action assignments in 80 clusters. All required Month 1 and Month 2 JSONL artifacts were nonempty and had their required fields.
+
+The July 2026 quality audit found actions in 1,100 clips (64.6%), record-level tool context for 87.3% of triples, VerbNet mappings for 71.1% of action lemmas, and FrameNet mappings for 69.4%. It also generated 60 deterministic manual-review rows across four error-analysis groups. Record-level tool context is reported separately from direct tool extraction because availability is not the same as correctness.
 
 Month 3 was intentionally not run. `indexed-videos-250.jsonl` has no step records, pairwise relevance labels, or dense embeddings, so a dense-versus-structured retrieval score would not be real. No synthetic project dataset was added; the only invented rows remain small unit-test fixtures.

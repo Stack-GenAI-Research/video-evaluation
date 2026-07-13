@@ -93,8 +93,10 @@ class ActionTriple(BaseModel):
     object_lemmas: list[str] = Field(default_factory=list)
     tool_text: str | None = None
     tool_lemmas: list[str] = Field(default_factory=list)
+    context_tool_lemmas: list[str] = Field(default_factory=list)
     material_text: str | None = None
     material_lemmas: list[str] = Field(default_factory=list)
+    context_material_lemmas: list[str] = Field(default_factory=list)
     negated: bool = False
     sentence: str
     token_start: int | None = None

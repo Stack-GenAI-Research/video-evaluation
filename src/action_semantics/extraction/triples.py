@@ -161,5 +161,7 @@ def triple_dict_for_analysis(triple: ActionTriple) -> dict[str, Any]:
     data = triple.model_dump(mode="json")
     data["object_lemmas_joined"] = ";".join(triple.object_lemmas)
     data["tool_lemmas_joined"] = ";".join(triple.tool_lemmas)
+    data["context_tool_lemmas_joined"] = ";".join(triple.context_tool_lemmas)
     data["material_lemmas_joined"] = ";".join(triple.material_lemmas)
+    data["context_material_lemmas_joined"] = ";".join(triple.context_material_lemmas)
     return data

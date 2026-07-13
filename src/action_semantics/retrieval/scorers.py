@@ -136,8 +136,8 @@ def structured_score(
         [triple.object_lemmas for triple in clip_triples],
     )
     tool_score = max_pairwise_jaccard(
-        [triple.tool_lemmas for triple in step_triples],
-        [triple.tool_lemmas for triple in clip_triples],
+        [triple.tool_lemmas or triple.context_tool_lemmas for triple in step_triples],
+        [triple.tool_lemmas or triple.context_tool_lemmas for triple in clip_triples],
     )
     action_score = _action_match(step_triples, clip_triples)
     verbnet_score = _verbnet_match(step_triples, clip_triples, resources.verbnet_lookup)

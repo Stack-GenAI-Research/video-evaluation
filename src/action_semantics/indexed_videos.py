@@ -9,6 +9,7 @@ separate from fields derived by this repository.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -18,14 +19,24 @@ from .text import normalize_text
 
 
 def _as_string_list(value: Any) -> list[str]:
-    """Turn a comma-separated sample field into a clean list of terms."""
+    """Turn simple or Gemini-annotated inventory text into primary item names."""
     if value is None:
         return []
     if isinstance(value, list):
         values = value
     else:
-        values = str(value).split(",")
-    return [text for item in values if (text := normalize_text(item))]
+        text = str(value)
+        if " used for " in text.lower() or " alternatives:" in text.lower():
+            values = re.split(r"\.\s*,\s*(?=[A-Z0-9])", text)
+        else:
+            values = text.split(",")
+    output: list[str] = []
+    for item in values:
+        primary = re.split(r"\s+alternatives:|\s+used for", str(item), maxsplit=1, flags=re.I)[0]
+        primary = re.sub(r"\s+(unknown|not specified)$", "", primary, flags=re.I)
+        if cleaned := normalize_text(primary).rstrip("."):
+            output.append(cleaned)
+    return output
 
 
 def _source_video_id(row: dict[str, Any], row_number: int) -> str:
@@ -99,6 +110,8 @@ def flatten_indexed_videos(source_path: Path) -> tuple[list[dict[str, Any]], dic
                             "end_seconds": nested_clip.get("end"),
                             "tools": tools,
                             "supplies": supplies,
+                            "source_tools_text": normalize_text(nested_clip.get("tools")) or None,
+                            "source_supplies_text": normalize_text(nested_clip.get("supplies")) or None,
                         },
                     },
                     "dense_embeddings": {},

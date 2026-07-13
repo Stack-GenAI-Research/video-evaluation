@@ -1,7 +1,12 @@
 import json
 
-from action_semantics.indexed_videos import flatten_indexed_videos, prepare_indexed_videos
-from action_semantics.models import ClipRecord
+from action_semantics.indexed_videos import (
+    _as_string_list,
+    flatten_indexed_videos,
+    prepare_indexed_videos,
+)
+from action_semantics.models import ActionTriple, ClipRecord
+from action_semantics.month1 import add_record_inventories
 from action_semantics.text import clip_text_segments
 
 
@@ -75,3 +80,37 @@ def test_indexed_video_inventory_metadata_is_not_parsed_as_action_text():
     assert [(segment.source_field, segment.text) for segment in segments] == [
         ("title", "Tighten the hinge")
     ]
+
+
+def test_record_tools_are_preserved_as_separate_context():
+    clip = ClipRecord(
+        clip_id="clip-1",
+        gemini_metadata={
+            "clip": {"tools": ["Cordless Drill"], "supplies": ["Wood glue"]}
+        },
+    )
+    triple = ActionTriple(
+        record_type="clip",
+        record_id="clip-1",
+        source_field="title",
+        action="drill",
+        action_lemma="drill",
+        action_text="Drill",
+        sentence="Drill the pilot hole.",
+        extraction_method="test",
+    )
+
+    enriched = add_record_inventories([triple], [clip], [])
+
+    assert enriched[0].tool_lemmas == []
+    assert enriched[0].context_tool_lemmas == ["cordless", "cordless drill", "drill"]
+    assert enriched[0].context_material_lemmas == ["glue", "wood", "wood glue"]
+
+
+def test_annotated_tool_inventory_keeps_primary_names_only():
+    value = (
+        "Cordless Drill Ridgid alternatives: Impact driver used for Driving screws., "
+        "Work Gloves Unknown used for Protecting hands."
+    )
+
+    assert _as_string_list(value) == ["Cordless Drill Ridgid", "Work Gloves"]

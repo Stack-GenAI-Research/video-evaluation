@@ -12,11 +12,12 @@ COMMAND="${1:-all}"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/run_local_pipeline.sh [setup|test|sample|all|full]
+Usage: ./scripts/run_local_pipeline.sh [setup|test|sample|review|all|full]
 
   setup   Create a Python 3.11-3.13 virtual environment and install dependencies.
   test    Compile the project, run pytest, run Ruff, and show CLI help.
   sample  Run the real IndexedVideo sample through Months 1 and 2.
+  review  Summarize the human labels added to manual_review_sample.csv.
   all     Run setup, test, and sample. This is the normal local command.
   full    Run Months 1-3 on complete exports supplied through environment variables.
 
@@ -85,6 +86,20 @@ run_sample() {
     --output-dir "$SAMPLE_OUTPUT_DIR"
   echo
   echo "Sample report: $SAMPLE_OUTPUT_DIR/sample_analysis_report.json"
+  echo "Review worksheet: $SAMPLE_OUTPUT_DIR/quality/manual_review_sample.csv"
+}
+
+summarize_review() {
+  ensure_environment
+  local review_csv="$SAMPLE_OUTPUT_DIR/quality/manual_review_sample.csv"
+  if [[ ! -f "$review_csv" ]]; then
+    echo "Review worksheet not found: $review_csv" >&2
+    echo "Run the sample command first." >&2
+    return 1
+  fi
+  "$VENV_DIR/bin/action-semantics" summarize-review \
+    --review-csv "$review_csv" \
+    --output-json "$SAMPLE_OUTPUT_DIR/quality/manual_review_results.json"
 }
 
 run_full() {
@@ -111,6 +126,7 @@ case "$COMMAND" in
   setup) setup ;;
   test) run_tests ;;
   sample) run_sample ;;
+  review) summarize_review ;;
   all)
     setup
     run_tests

@@ -12,6 +12,7 @@ from .logging_utils import info
 from .month1 import run_month1 as run_month1_impl
 from .month2 import run_month2 as run_month2_impl
 from .quality import require_nonempty_report, validate_jsonl_basic
+from .quality_review import summarize_manual_review
 from .retrieval.experiments import run_month3 as run_month3_impl
 from .sample_analysis import run_indexed_video_analysis as run_indexed_video_analysis_impl
 from .verification import verify_output_repository, verify_structured_analysis
@@ -200,6 +201,17 @@ def verify_structured_outputs(
         "Structured-analysis verification passed. Report written to "
         f"{output_dir / 'structured_analysis_verification_report.json'}"
     )
+
+
+@app.command()
+def summarize_review(
+    review_csv: Annotated[Path, typer.Option(exists=True, readable=True)],
+    output_json: Annotated[Path, typer.Option()],
+) -> None:
+    """Calculate extraction precision after the manual review CSV is labeled."""
+    summary = summarize_manual_review(review_csv, output_json)
+    labeled = summary["overall"]["action_correct"]["labeled"]
+    info(f"Summarized {labeled} labeled actions. Report written to {output_json}")
 
 
 if __name__ == "__main__":

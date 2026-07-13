@@ -9,6 +9,7 @@ from .config import PipelineConfig
 from .indexed_videos import prepare_indexed_videos
 from .month1 import run_month1
 from .month2 import run_month2
+from .quality_review import build_quality_review
 from .verification import verify_structured_analysis
 
 
@@ -34,10 +35,18 @@ def run_indexed_video_analysis(
         config=config,
         min_taxonomy_support=min_taxonomy_support,
     )
+    quality = build_quality_review(
+        clips_jsonl=input_paths["clips"],
+        month1_dir=month1["month_dir"],
+        month2_dir=month2["month_dir"],
+        output_dir=output_dir / "quality",
+        random_seed=random_seed,
+    )
     verification = verify_structured_analysis(output_dir)
     profile = json.loads(input_paths["profile"].read_text(encoding="utf-8"))
     summary = json.loads(month1["summary"].read_text(encoding="utf-8"))
     diagnostics = json.loads(month2["diagnostics"].read_text(encoding="utf-8"))
+    quality_summary = json.loads(quality["quality_summary"].read_text(encoding="utf-8"))
     report_path = output_dir / "sample_analysis_report.json"
     report_path.write_text(
         json.dumps(
@@ -45,6 +54,7 @@ def run_indexed_video_analysis(
                 "input_profile": profile,
                 "month1": summary,
                 "month2_taxonomy": diagnostics,
+                "extraction_quality": quality_summary,
                 "verification_artifacts": sorted(verification),
                 "evaluation_status": (
                     "Month 3 was intentionally not run: this source has no steps, "
@@ -56,4 +66,10 @@ def run_indexed_video_analysis(
         ),
         encoding="utf-8",
     )
-    return {"report": report_path, "profile": input_paths["profile"], **month1, **month2}
+    return {
+        "report": report_path,
+        "profile": input_paths["profile"],
+        **month1,
+        **month2,
+        **quality,
+    }

@@ -15,6 +15,8 @@ _NON_NARRATIVE_INDEXED_VIDEO_METADATA_PREFIXES = (
     "gemini_metadata.source_video",
     "gemini_metadata.clip.tools",
     "gemini_metadata.clip.supplies",
+    "gemini_metadata.clip.source_tools_text",
+    "gemini_metadata.clip.source_supplies_text",
 )
 
 
