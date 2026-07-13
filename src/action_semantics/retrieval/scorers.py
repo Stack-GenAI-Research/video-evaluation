@@ -17,7 +17,7 @@ from action_semantics.models import (
 from action_semantics.retrieval.embeddings import mean_dense_score
 
 
-STRUCTURED_SCORER_VERSION = "aligned-action-object-tool-material-v3"
+STRUCTURED_SCORER_VERSION = "aligned-action-object-context-v4"
 
 
 def jaccard(left: Iterable[str], right: Iterable[str]) -> float:
@@ -61,37 +61,34 @@ class StructuredResources:
 
 @dataclass(frozen=True)
 class StructuredWeights:
-    """Weights for one aligned action-object-tool comparison.
+    """Weights for one aligned action-object-context comparison.
 
     VerbNet and FrameNet are fallbacks inside the action component.  They are
     not added again as independent evidence.  The exploratory taxonomy is
-    deliberately excluded from the production score until it has been
-    manually evaluated.
+    deliberately excluded from the production score until it has been manually
+    evaluated.  Spatial scope is diagnostic-only because the current parser
+    does not measure temporal step boundaries.
     """
 
-    action: float = 0.50
-    object: float = 0.30
-    tool: float = 0.10
-    material: float = 0.10
+    action: float = 0.55
+    object: float = 0.35
+    context: float = 0.10
 
     def normalized(
         self,
         *,
         has_object: bool = True,
-        has_tool: bool = True,
-        has_material: bool = True,
+        has_context: bool = True,
     ) -> "StructuredWeights":
         object_weight = self.object if has_object else 0.0
-        tool_weight = self.tool if has_tool else 0.0
-        material_weight = self.material if has_material else 0.0
-        total = self.action + object_weight + tool_weight + material_weight
+        context_weight = self.context if has_context else 0.0
+        total = self.action + object_weight + context_weight
         if total <= 0:
             raise ValueError("Structured weights must sum to a positive value.")
         return StructuredWeights(
             action=self.action / total,
             object=object_weight / total,
-            tool=tool_weight / total,
-            material=material_weight / total,
+            context=context_weight / total,
         )
 
 
@@ -147,14 +144,26 @@ def _triple_pair_score(
 ) -> dict[str, float]:
     action, exact, verbnet, framenet = _action_similarity(query, candidate, resources)
     object_score = _query_term_coverage(query.object_lemmas, candidate.object_lemmas)
-    query_tools = query.tool_lemmas or query.context_tool_lemmas
-    candidate_tools = candidate.tool_lemmas or candidate.context_tool_lemmas
-    tool_score = _query_term_coverage(query_tools, candidate_tools)
-    query_materials = query.material_lemmas or query.context_material_lemmas
-    candidate_materials = (
-        candidate.material_lemmas or candidate.context_material_lemmas
+    # A phrase introduced by "with" or "using" can name either a tool
+    # (screwdriver) or a consumable supply (primer).  Compare it with both
+    # inventories instead of forcing that ambiguous phrase into one class.
+    query_tool_context = set(query.tool_lemmas) | set(query.context_tool_lemmas)
+    query_supply_context = set(query.context_material_lemmas)
+    candidate_tools = set(candidate.tool_lemmas) | set(candidate.context_tool_lemmas)
+    candidate_supplies = set(candidate.context_material_lemmas)
+    tool_score = _query_term_coverage(query_tool_context, candidate_tools)
+    supply_score = max(
+        _query_term_coverage(query_tool_context, candidate_supplies),
+        _query_term_coverage(query_supply_context, candidate_supplies),
     )
-    material_score = _query_term_coverage(query_materials, candidate_materials)
+    context_score = max(tool_score, supply_score)
+
+    # ``material_lemmas`` is a legacy field name for objects of prepositions
+    # such as "on", "in", and "into".  It is spatial location/scope, not a
+    # supply inventory, and is intentionally diagnostic-only.
+    scope_score = _query_term_coverage(
+        query.material_lemmas, candidate.material_lemmas
+    )
     taxonomy = _taxonomy_pair_match(query, candidate, resources.taxonomy_lookup)
 
     # A positive/negative mismatch changes the meaning of an instruction.  It
@@ -165,14 +174,12 @@ def _triple_pair_score(
     else:
         weights = base_weights.normalized(
             has_object=bool(query.object_lemmas),
-            has_tool=bool(query_tools),
-            has_material=bool(query_materials),
+            has_context=bool(query_tool_context or query_supply_context),
         )
         component_score = (
             weights.action * action
             + weights.object * object_score
-            + weights.tool * tool_score
-            + weights.material * material_score
+            + weights.context * context_score
         )
         # Object/tool evidence is meaningful only when the actions are at
         # least compatible.  This prevents an unrelated action on the same
@@ -188,8 +195,10 @@ def _triple_pair_score(
         "framenet_match": float(framenet),
         "taxonomy_match": float(taxonomy),
         "object_match": float(object_score),
+        "context_match": float(context_score),
         "tool_match": float(tool_score),
-        "material_match": float(material_score),
+        "supply_match": float(supply_score),
+        "scope_match": float(scope_score),
     }
 
 
@@ -209,8 +218,10 @@ def structured_score(
         "framenet_match",
         "taxonomy_match",
         "object_match",
+        "context_match",
         "tool_match",
-        "material_match",
+        "supply_match",
+        "scope_match",
     )
     if not step_triples or not clip_triples:
         return {name: 0.0 for name in metric_names}
@@ -229,7 +240,7 @@ def structured_score(
                     row["structured_score"],
                     row["action_match"],
                     row["object_match"],
-                    row["tool_match"],
+                    row["context_match"],
                 ),
             )
         )
@@ -261,8 +272,10 @@ def score_step_clip(
         hybrid_score=hybrid,
         action_match=structured_parts["action_match"],
         object_match=structured_parts["object_match"],
+        context_match=structured_parts["context_match"],
         tool_match=structured_parts["tool_match"],
-        material_match=structured_parts["material_match"],
+        supply_match=structured_parts["supply_match"],
+        scope_match=structured_parts["scope_match"],
         taxonomy_match=structured_parts["taxonomy_match"],
         framenet_match=structured_parts["framenet_match"],
         verbnet_match=structured_parts["verbnet_match"],

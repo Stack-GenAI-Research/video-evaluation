@@ -94,6 +94,8 @@ class ActionTriple(BaseModel):
     tool_text: str | None = None
     tool_lemmas: list[str] = Field(default_factory=list)
     context_tool_lemmas: list[str] = Field(default_factory=list)
+    # Legacy serialized names: direct values mean spatial location/scope;
+    # context values come from the record's supply/material inventory.
     material_text: str | None = None
     material_lemmas: list[str] = Field(default_factory=list)
     context_material_lemmas: list[str] = Field(default_factory=list)
@@ -152,8 +154,10 @@ class ScoreRow(BaseModel):
     hybrid_score: float | None = None
     action_match: float | None = None
     object_match: float | None = None
+    context_match: float | None = None
     tool_match: float | None = None
-    material_match: float | None = None
+    supply_match: float | None = None
+    scope_match: float | None = None
     taxonomy_match: float | None = None
     framenet_match: float | None = None
     verbnet_match: float | None = None

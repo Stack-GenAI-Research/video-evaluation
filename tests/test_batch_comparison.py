@@ -230,6 +230,33 @@ def test_run_batch_comparison_writes_neutral_and_blinded_artifacts(
     assert first["blind_review"].read_bytes() == second["blind_review"].read_bytes()
 
 
+def test_batch_rerun_preserves_a_completed_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _make_scoring_artifacts(tmp_path, monkeypatch)
+    fieldnames, rows = _read_csv(paths["blind_review"])
+    rows[0]["overall_relevant"] = "yes"
+    _write_csv(paths["blind_review"], fieldnames, rows)
+    original_review = paths["blind_review"].read_text(encoding="utf-8")
+
+    rerun = batch_comparison.run_batch_comparison(
+        comparisons_jsonl=tmp_path / "score-input.jsonl",
+        clips_jsonl=tmp_path / "score-clips.jsonl",
+        month1_dir=tmp_path / "month1",
+        month2_dir=tmp_path / "month2",
+        output_dir=tmp_path / "score-output",
+        spacy_model="test-model",
+        challenger_method="hybrid",
+        top_k=2,
+    )
+
+    assert paths["blind_review"].read_text(encoding="utf-8") == original_review
+    assert rerun["blind_review"].name == "blind_review.generated.csv"
+    assert rerun["rankings"].name == "rankings.generated.jsonl"
+    summary = json.loads(rerun["summary"].read_text(encoding="utf-8"))
+    assert summary["preserved_existing_human_review"] is True
+
+
 @pytest.mark.parametrize(
     "rows, error",
     [

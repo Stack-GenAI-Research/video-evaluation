@@ -76,6 +76,24 @@ class StepComparisonInput(BaseModel):
         return self
 
 
+def _contains_human_review(path: Path) -> bool:
+    """Return true when overwriting ``path`` could erase reviewer work."""
+    if not path.exists():
+        return False
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+    except (OSError, csv.Error, UnicodeError):
+        # An unreadable existing file is still user data. Preserve it.
+        return True
+    human_columns = (*_REVIEW_DIMENSIONS, "notes")
+    return any(
+        (row.get(column) or "").strip()
+        for row in rows
+        for column in human_columns
+    )
+
+
 def _read_inputs(path: Path) -> list[StepComparisonInput]:
     rows: list[StepComparisonInput] = []
     with path.open("r", encoding="utf-8") as handle:
@@ -350,9 +368,14 @@ def run_batch_comparison(
         "winner": None,
     }
 
-    rankings_path = output_dir / "rankings.jsonl"
-    summary_path = output_dir / "comparison_summary.json"
-    review_path = output_dir / "blind_review.csv"
+    canonical_review_path = output_dir / "blind_review.csv"
+    preserved_existing_review = _contains_human_review(canonical_review_path)
+    suffix = ".generated" if preserved_existing_review else ""
+    rankings_path = output_dir / f"rankings{suffix}.jsonl"
+    summary_path = output_dir / f"comparison_summary{suffix}.json"
+    review_path = output_dir / f"blind_review{suffix}.csv"
+    summary["preserved_existing_human_review"] = preserved_existing_review
+    summary["artifact_suffix"] = suffix
     write_jsonl(rankings_path, ranking_rows)
     summary_path.write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"

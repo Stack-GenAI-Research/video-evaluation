@@ -93,16 +93,11 @@ run_sample() {
 }
 
 index_is_current() {
-  local profile="$SAMPLE_OUTPUT_DIR/input/indexed_video_profile.json"
-  local triples="$SAMPLE_OUTPUT_DIR/month1/action_object_tool_triples.jsonl"
-  if [[ ! -f "$SAMPLE_JSONL" || ! -f "$profile" || ! -f "$triples" ]]; then
-    return 1
-  fi
-  local stored_hash
-  local current_hash
-  stored_hash="$("$VENV_DIR/bin/python" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("source_sha256", ""))' "$profile")"
-  current_hash="$(shasum -a 256 "$SAMPLE_JSONL" | cut -d ' ' -f 1)"
-  [[ -n "$stored_hash" && "$stored_hash" == "$current_hash" ]]
+  [[ -f "$SAMPLE_JSONL" && -d "$SAMPLE_OUTPUT_DIR" ]] || return 1
+  "$VENV_DIR/bin/action-semantics" index-current \
+    --indexed-videos-jsonl "$SAMPLE_JSONL" \
+    --output-dir "$SAMPLE_OUTPUT_DIR" \
+    >/dev/null 2>&1
 }
 
 ensure_sample_index() {
@@ -194,7 +189,6 @@ compare_batch_sample() {
     --month2-dir "$SAMPLE_OUTPUT_DIR/month2" \
     --output-dir "$SAMPLE_OUTPUT_DIR/batch-comparison" \
     "${@:3}"
-  echo "Blind review worksheet: $SAMPLE_OUTPUT_DIR/batch-comparison/blind_review.csv"
 }
 
 score_batch_review_sample() {

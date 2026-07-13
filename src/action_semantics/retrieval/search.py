@@ -157,8 +157,10 @@ def rank_indexed_clips(
         "action_match": 0.0,
         "exact_action_match": 0.0,
         "object_match": 0.0,
+        "context_match": 0.0,
         "tool_match": 0.0,
-        "material_match": 0.0,
+        "supply_match": 0.0,
+        "scope_match": 0.0,
         "verbnet_match": 0.0,
         "framenet_match": 0.0,
         "taxonomy_match": 0.0,
@@ -186,8 +188,10 @@ def rank_indexed_clips(
                     "action": parts["action_match"],
                     "exact_action": parts["exact_action_match"],
                     "object": parts["object_match"],
+                    "tool_or_supply_context": parts["context_match"],
                     "tool": parts["tool_match"],
-                    "material": parts["material_match"],
+                    "supply": parts["supply_match"],
+                    "location_or_scope_diagnostic": parts["scope_match"],
                     "verbnet": parts["verbnet_match"],
                     "framenet": parts["framenet_match"],
                     # Diagnostic only. It is not part of structured_score.
@@ -231,11 +235,20 @@ def rank_indexed_clips(
             "objects": sorted(
                 {term for row in query_triples for term in row.object_lemmas}
             ),
-            "tools": sorted(
+            "with_or_using_context": sorted(
                 {
                     term
                     for row in query_triples
                     for term in (row.tool_lemmas or row.context_tool_lemmas)
+                }
+            ),
+            "location_or_scope": sorted(
+                {
+                    term
+                    for row in query_triples
+                    for term in (
+                        row.material_lemmas or row.context_material_lemmas
+                    )
                 }
             ),
         },

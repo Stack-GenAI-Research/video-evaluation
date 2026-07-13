@@ -21,7 +21,7 @@ The test command runs compilation, pytest, Ruff, CLI help, and the Bash syntax
 check. The final result was:
 
 ```text
-51 passed
+55 passed
 All Ruff checks passed
 CLI help rendered successfully
 Bash syntax check passed
@@ -34,7 +34,7 @@ The real private sample was parsed without synthetic records:
 ```text
 source videos:                    250
 raw nested clip rows:           1,703
-valid source rows:              1,700
+valid clip annotations:        1,700
 invalid rows quarantined:           3
 duplicate valid rows merged:       37
 canonical searchable segments: 1,663
@@ -78,28 +78,35 @@ These are functional smoke tests, not accuracy estimates.
 ## Benchmark checks
 
 The benchmark kept one fixed pool of 582 candidates and excluded clip titles
-and parent-video text from every candidate representation. Forty-six terse
-queries were recovered by the imperative fallback. After removing ambiguous
-query names, exact phrase leaks, and remaining unparseable queries, all methods
-were evaluated on the same 463 queries.
+and parent-video text from every candidate representation. Forty-five terse
+queries were recovered by the imperative fallback; 43 remained eligible after
+the other query controls. After removing ambiguous query names, exact phrase
+leaks, and remaining unparseable queries, all methods were evaluated on the
+same 462 queries.
+
+The benchmark now counts a zero target score as no retrieved result. It also
+uses expected credit across exact score ties instead of letting clip-ID order
+choose the outcome. The structured method had a positive target score for 340
+of 462 queries (73.6%) and a positive target tie on 213 queries (46.1%).
 
 Whole-corpus results:
 
 ```text
 method                 Hit@1   Hit@3   Hit@10   MRR
-lexical TF-IDF          .631    .855     .933   .749
-structured action       .261    .354     .475   .334
-50/50 hybrid            .505    .616     .680   .577
+lexical TF-IDF          .632    .855     .933   .749
+structured action       .263    .366     .475   .336
+50/50 hybrid            .504    .613     .677   .574
 ```
 
 For hybrid minus lexical Hit@1, the video-cluster bootstrap estimate was
--0.125 with a 95% interval of approximately [-0.184, -0.069]. The hybrid is
+-0.128 with a 95% interval of approximately [-0.188, -0.070]. The hybrid is
 therefore worse on this whole-corpus proxy task.
 
-In the within-video task, lexical and hybrid both reached Hit@1 = .726. The
-hybrid-minus-lexical estimate was 0.000 with a 95% interval of approximately
-[-0.051, 0.053]. This run detected no difference, but the interval still allows
-modest harm or benefit and is not an equivalence test.
+In the within-video task, lexical reached Hit@1 = .727 and hybrid reached .723.
+The hybrid-minus-lexical estimate was -0.004 with a 95% interval of
+approximately [-0.058, 0.050]. This run detected no reliable difference, but
+the interval still allows modest harm or benefit and is not an equivalence
+test.
 
 ## Remaining manual check
 

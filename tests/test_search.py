@@ -21,6 +21,7 @@ def _triple(
     *,
     tool: str | None = None,
     material: str | None = None,
+    supply: str | None = None,
     negated: bool = False,
 ) -> ActionTriple:
     return ActionTriple(
@@ -33,6 +34,7 @@ def _triple(
         object_lemmas=[obj],
         tool_lemmas=[tool] if tool else [],
         material_lemmas=[material] if material else [],
+        context_material_lemmas=[supply] if supply else [],
         negated=negated,
         sentence=f"{action} the {obj}",
         extraction_method="test",
@@ -120,19 +122,36 @@ def test_taxonomy_is_diagnostic_and_cannot_make_unrelated_actions_match():
     assert result["structured_score"] == 0.0
 
 
-def test_material_or_supply_evidence_is_part_of_an_aligned_match():
+def test_with_context_can_match_a_candidate_supply_inventory():
     triples = [
-        _triple("step", "query", "apply", "wall", material="primer"),
-        _triple("clip", "matching", "apply", "wall", material="primer"),
-        _triple("clip", "wrong", "apply", "wall", material="paint"),
+        _triple("step", "query", "apply", "wall", tool="primer"),
+        _triple("clip", "matching", "apply", "wall", supply="primer"),
+        _triple("clip", "wrong", "apply", "wall", supply="paint"),
     ]
     resources = StructuredResources(triples=triples, verbnet=[], framenet=[], taxonomy=[])
 
     matching = structured_score("query", "matching", resources)
     wrong = structured_score("query", "wrong", resources)
 
-    assert matching["material_match"] == 1.0
+    assert matching["supply_match"] == 1.0
+    assert matching["context_match"] == 1.0
     assert matching["structured_score"] > wrong["structured_score"]
+
+
+def test_spatial_scope_is_diagnostic_and_not_supply_inventory():
+    triples = [
+        _triple("step", "query", "place", "fixture", material="wall"),
+        _triple("clip", "matching", "place", "fixture", material="wall"),
+        _triple("clip", "other", "place", "fixture", material="floor"),
+    ]
+    resources = StructuredResources(triples=triples, verbnet=[], framenet=[], taxonomy=[])
+
+    matching = structured_score("query", "matching", resources)
+    other = structured_score("query", "other", resources)
+
+    assert matching["scope_match"] == 1.0
+    assert other["scope_match"] == 0.0
+    assert matching["structured_score"] == other["structured_score"]
 
 
 def test_public_search_ranks_results_and_applies_video_diversity(tmp_path, monkeypatch):
@@ -145,10 +164,14 @@ def test_public_search_ranks_results_and_applies_video_diversity(tmp_path, monke
             {"clip_id": "other-video", "video_id": "v2", "title": "Install faucet"},
         ],
     )
-    query = _triple("step", QUERY_ID, "remove", "faucet")
+    query = _triple(
+        "step", QUERY_ID, "remove", "faucet", tool="wrench", material="wall"
+    )
     resources = StructuredResources(
         triples=[
-            _triple("clip", "best", "remove", "faucet"),
+            _triple(
+                "clip", "best", "remove", "faucet", tool="wrench", material="wall"
+            ),
             _triple("clip", "same-video", "remove", "filter"),
             _triple("clip", "other-video", "install", "faucet"),
         ],
@@ -181,6 +204,8 @@ def test_public_search_ranks_results_and_applies_video_diversity(tmp_path, monke
     assert result["schema_version"] == "search.v2"
     assert [row["clip_id"] for row in result["results"]] == ["best", "other-video"]
     assert [row["rank"] for row in result["results"]] == [1, 2]
+    assert result["query"]["with_or_using_context"] == ["wrench"]
+    assert result["query"]["location_or_scope"] == ["wall"]
     assert result["index"]["taxonomy_used_for_ranking"] is False
     assert result["index"]["structured_scorer"] == STRUCTURED_SCORER_VERSION
 

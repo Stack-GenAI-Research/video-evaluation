@@ -13,7 +13,7 @@ from action_semantics.text import normalize_term
 
 _OBJECT_DEPS = {"dobj", "obj", "pobj", "attr", "dative", "oprd"}
 _SUBJECT_DEPS = {"nsubj", "nsubjpass", "csubj", "agent"}
-_MATERIAL_PREPS = {"into", "onto", "on", "in", "over", "under", "through", "around"}
+_SCOPE_PREPS = {"into", "onto", "on", "in", "over", "under", "through", "around"}
 _TOOL_PREPS = {"with", "using", "via", "by"}
 _NEG_DEPS = {"neg"}
 
@@ -116,7 +116,7 @@ def triples_from_doc(segment: TextSegment, doc: Doc) -> list[ActionTriple]:
                 continue
             object_tokens = _first_object_span(token)
             tool_tokens = _prep_object_span(token, _TOOL_PREPS)
-            material_tokens = _prep_object_span(token, _MATERIAL_PREPS)
+            scope_tokens = _prep_object_span(token, _SCOPE_PREPS)
             action_lemma = normalize_term(token.lemma_ or token.text)
             if not action_lemma:
                 continue
@@ -132,8 +132,10 @@ def triples_from_doc(segment: TextSegment, doc: Doc) -> list[ActionTriple]:
                     object_lemmas=_content_lemmas(object_tokens),
                     tool_text=_clean_span_text(tool_tokens),
                     tool_lemmas=_content_lemmas(tool_tokens),
-                    material_text=_clean_span_text(material_tokens),
-                    material_lemmas=_content_lemmas(material_tokens),
+                    # These legacy-named fields hold spatial location/scope,
+                    # not the record's supply inventory.
+                    material_text=_clean_span_text(scope_tokens),
+                    material_lemmas=_content_lemmas(scope_tokens),
                     negated=_is_negated(token),
                     sentence=sentence.text.strip(),
                     token_start=token.i,

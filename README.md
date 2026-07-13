@@ -10,12 +10,12 @@ I am trying to answer one practical question:
 Normal text search is good at finding the same general topic. It is not always
 good at distinguishing `remove faucet` from `install faucet`, or `tighten screw`
 from another step that merely mentions screws. This project tests whether an
-explicit action–object–tool representation can improve that search.
+explicit action–object–tool/supply representation can improve that search.
 
 There are now three working search methods:
 
 - `lexical`: ordinary TF-IDF word matching
-- `structured`: matching aligned action–object–tool–material records
+- `structured`: matching aligned action–object–tool/supply records
 - `hybrid`: a 50/50 combination of lexical and structured scores
 
 The research question is not settled in advance. The code now runs the
@@ -108,10 +108,11 @@ Useful method choices are:
 ```
 
 Each result contains the canonical clip ID, video ID, title, URL, start/end
-timestamps, total score, and separate lexical, action, object, tool, and
-material signals. Zero-score clips are not returned just to fill the requested
-number of results. If the action parser misses a noun-like query, hybrid search
-falls back to lexical search and records a warning instead of crashing.
+timestamps, total score, and separate lexical, action, object, tool, supply,
+and location/scope diagnostic signals. Zero-score clips are not returned just
+to fill the requested number of results. If the action parser misses a
+noun-like query, hybrid search falls back to lexical search and records a
+warning instead of crashing.
 
 Examples from the current index are encouraging at a qualitative level:
 
@@ -143,11 +144,18 @@ triple. It cannot take `tighten` from one sentence and `screw` from an unrelated
 sentence to manufacture a strong match. Object and tool evidence only helps
 when the actions are compatible, and positive and negated actions do not match.
 
-The current structured score gives 50% of its weight to the action, 30% to the
-object, 10% to the tool, and 10% to a material or supply. If the query does not
-name a tool or material, that unused weight is redistributed over the parts
-that are present. This keeps a query such as `paint wall with primer` from being
-treated exactly like `paint wall with stain`.
+The current structured score gives 55% of its weight to the action, 35% to the
+object, and 10% to tool-or-supply context. If the query does not name an object
+or context item, the unused weight is redistributed over the parts that are
+present.
+
+There is one deliberate compromise. A phrase such as `with a screwdriver`
+names a tool, while `with primer` names a consumable supply. The dependency
+parser cannot always tell those apart, so the scorer checks the phrase against
+both the clip's tool inventory and its supply inventory and uses the better
+match. Phrases such as `on the wall` or `into the housing` are reported as a
+location/scope diagnostic, but they do not affect the production score. This
+keeps locations from being incorrectly compared with material inventories.
 
 VerbNet and FrameNet are used as weaker fallbacks when verbs differ. The early
 DIY taxonomy is still generated for research, but it is not used for ranking;
@@ -210,7 +218,10 @@ more promising place to continue testing action features.
 
 This benchmark uses a paired field as weak ground truth. It is useful for
 development, but another clip could also be a valid answer. Only human review
-can decide overall relevance in that situation.
+can decide overall relevance in that situation. The clip names and descriptions
+were also generated together, so they can still share partial wording or
+paraphrases after exact phrases are removed. This controls the most direct
+leakage; it does not make the fields fully independent.
 
 ## Compare two result sets
 
@@ -270,8 +281,8 @@ The exact input contract is in
 - The private nested JSONL is strictly validated and parsed completely.
 - Invalid intervals and duplicate temporal segments are handled explicitly.
 - Stable canonical clip IDs and a reproducible build manifest are generated.
-- Action, object, direct tool, material, inventory context, VerbNet, and
-  FrameNet features are extracted from real records.
+- Action, object, direct tool, tool/supply inventory context, spatial scope,
+  VerbNet, and FrameNet features are extracted from real records.
 - Search works with lexical, structured, and hybrid ranking.
 - Short commands support top-k search and optional one-result-per-video output.
 - One-query comparison no longer makes circular improvement claims.

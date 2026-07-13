@@ -9,6 +9,7 @@ import typer
 
 from .config import DEFAULT_RANDOM_SEED, DEFAULT_SPACY_MODEL, PipelineConfig
 from .indexed_videos import prepare_indexed_videos as prepare_indexed_videos_impl
+from .index_freshness import index_staleness_reasons
 from .logging_utils import info
 from .month1 import run_month1 as run_month1_impl
 from .month2 import run_month2 as run_month2_impl
@@ -102,6 +103,26 @@ def build_index(
 
 
 @app.command(hidden=True)
+def index_current(
+    indexed_videos_jsonl: Annotated[Path, typer.Option(exists=True, readable=True)],
+    output_dir: Annotated[Path, typer.Option(exists=True, file_okay=False, readable=True)],
+    spacy_model: Annotated[str, typer.Option()] = DEFAULT_SPACY_MODEL,
+) -> None:
+    """Exit successfully only when the generated index is safe to reuse."""
+    reasons = index_staleness_reasons(
+        source_jsonl=indexed_videos_jsonl,
+        output_dir=output_dir,
+        spacy_model=spacy_model,
+    )
+    if reasons:
+        typer.echo("Index rebuild required:", err=True)
+        for reason in reasons:
+            typer.echo(f"- {reason}", err=True)
+        raise typer.Exit(code=1)
+    info("Index source, code, model versions, configuration, and artifact hashes match.")
+
+
+@app.command(hidden=True)
 def run_month1(
     clips_jsonl: Annotated[Path, typer.Option(exists=True, readable=True)],
     steps_jsonl: Annotated[Path, typer.Option(exists=True, readable=True)],
@@ -110,7 +131,7 @@ def run_month1(
     spacy_model: Annotated[str, typer.Option()] = DEFAULT_SPACY_MODEL,
     random_seed: Annotated[int, typer.Option()] = DEFAULT_RANDOM_SEED,
 ) -> None:
-    """Month 1: extract action-object-tool triples and VerbNet mappings."""
+    """Month 1: extract action-object-tool-material records and VerbNet mappings."""
     paths = run_month1_impl(
         clips_jsonl=clips_jsonl,
         steps_jsonl=steps_jsonl,
@@ -341,6 +362,7 @@ def compare_batch(
         hybrid_alpha=hybrid_alpha,
     )
     info(f"Batch comparison complete. Summary written to {paths['summary']}")
+    info(f"Blind review worksheet written to {paths['blind_review']}")
 
 
 @app.command("score-review")

@@ -9,10 +9,11 @@ system. The automated ingest audit found:
 
 - 250 source videos and 1,703 raw clip annotations
 - 3 invalid intervals with `end <= start`
-- 1,700 valid source rows
+- 1,700 valid clip annotations
 - 36 duplicate timestamp groups containing 37 redundant rows
 - 1,663 canonical playable segments
-- 582 canonical segments with a description or goal for the held-out benchmark
+- 582 canonical segments with a description or goal for the field-held-out
+  development benchmark
 - 1,241 canonical segments with parsed tool metadata
 
 The parser retains all parent and clip fields, raw annotation variants,
@@ -32,19 +33,26 @@ The repository can now produce:
 
 ## Current measured result
 
-The held-out benchmark uses 582 candidates and 463 eligible queries. Candidate
-titles and parent-video text are excluded.
+The field-held-out development benchmark uses 582 candidates and 462 eligible
+queries. Candidate titles and parent-video text are excluded. It is a repeatable
+development test, not a final held-out-video evaluation.
 
 | Method | Hit@1 | Hit@3 | Hit@10 | MRR |
 |---|---:|---:|---:|---:|
-| Lexical TF-IDF | 63.1% | 85.5% | 93.3% | 0.749 |
-| Structured action | 26.1% | 35.4% | 47.5% | 0.334 |
-| 50/50 hybrid | 50.5% | 61.6% | 68.0% | 0.577 |
+| Lexical TF-IDF | 63.2% | 85.5% | 93.3% | 0.749 |
+| Structured action | 26.3% | 36.6% | 47.5% | 0.336 |
+| 50/50 hybrid | 50.4% | 61.3% | 67.7% | 0.574 |
 
 Structured action matching is not yet competitive for whole-corpus retrieval.
-Within a single source video, lexical and hybrid Hit@1 are both 72.6%, and the
-paired confidence interval includes zero. This is a useful direction to study,
-but not evidence that hybrid search is better.
+Within a single source video, lexical Hit@1 is 72.7% and hybrid Hit@1 is 72.3%.
+The paired confidence interval for the difference is approximately -5.8 to
++5.0 points. This is a useful direction to study, but not evidence that hybrid
+search is better.
+
+These results require a positive score before a target can receive a rank. Exact
+score ties receive expected rather than clip-ID-based credit. The structured
+method has positive target evidence on 73.6% of queries and a positive target
+tie on 46.1%, so coverage and coarse ties are major problems to improve.
 
 ## Data that is genuinely missing
 
@@ -76,7 +84,7 @@ stratified across categories, with the old top three preserved in rank order.
 2. Judge the pooled old/new clips using the generated blind worksheet.
 3. Report Precision@3, action/object/tool agreement, wins/ties/losses, and paired
    confidence intervals.
-4. Analyze the 106 narrative queries for which the current action parser still
+4. Analyze the 107 narrative queries for which the current action parser still
    finds no action.
 5. Tune parser/scorer changes on development videos only.
 6. Freeze the configuration and evaluate on held-out videos.
